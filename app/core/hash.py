@@ -1,0 +1,3 @@
+
+
+def hash_document()
