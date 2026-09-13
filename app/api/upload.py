@@ -5,7 +5,33 @@ from hashlib import sha256
 from dotenv import load_dotenv
 load_dotenv()
 import psycopg,os
+
+
 router = APIRouter()
+
+@router.get("/documents/{id}")
+async def get_documents_status(id:str):
+    try:
+        conn=psycopg.connect(
+            host='localhost',
+            dbname=os.environ.get("POSTGRES_DB"),
+            user=os.environ.get("POSTGRES_USER"),
+            password=os.environ.get("POSTGRES_PASSWORD")
+        )
+        with conn.cursor() as curr:
+            curr.execute("Select id, filename,status,error_message from documents where id= %s",(id,))
+            result=curr.fetchone()
+            if result is None:
+                return {"Invalid id":id}
+            else:
+                return {
+                    "Document_id": result[0],
+                    "Filename" : result[1],
+                    "status": result[2],
+                    "error_message": result[3]
+                }
+    except psycopg.Error as error:
+        return {"Database connection failed": str(error)}
 
 @router.post("/upload-file")
 async def upload_file(file:UploadFile = File(..., description="Upload a file")):
@@ -22,11 +48,12 @@ async def upload_file(file:UploadFile = File(..., description="Upload a file")):
         password=os.environ.get("POSTGRES_PASSWORD")
     )
     with conn.cursor() as curr:
-        curr.execute("Select id from documents where content_hash=%s",(hex_hash,))
+        curr.execute("Select id,status from documents where content_hash=%s",(hex_hash,))
         result= curr.fetchone()
         if result:
             conn.close()
-            return {"message": "File already exists in the database", "document_id": result[0],}
+            return {"message": "File already exists in the database", "document_id": result[0],
+                    "status":result[1]}
     file_path=f"upload/{hex_hash}.pdf"
     with open(file_path, "wb") as f:
         f.write(content_bytes)
@@ -37,4 +64,4 @@ async def upload_file(file:UploadFile = File(..., description="Upload a file")):
             print(f"Error occurred while inserting document: {e}")
     conn.commit()
     conn.close()
-    return {"filename": file.filename, "content_type": file.content_type, "size": len(content_bytes)}
+    return {"filename": file.filename, "content_type": file.content_type, "size": len(content_bytes),"status":"UPLOADED"}
