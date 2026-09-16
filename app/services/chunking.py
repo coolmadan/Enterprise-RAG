@@ -1,4 +1,5 @@
 from typing import Iterable
+import os
 from __future__ import annotations
 class TextChunk:
     chunk_index:int
