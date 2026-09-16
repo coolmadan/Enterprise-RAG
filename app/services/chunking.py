@@ -12,12 +12,14 @@ class DocumentChunkingService:
     def __init__(
             self,
             chunk_size:int=500,
-            chunk_overlap: int=75
+            chunk_overlap: int=75,
+            embedding_batch_size: int = 100,
     )-> None:
         if chunk_overlap >= chunk_size:
             raise ValueError("Chunk overlap must be smaller than chunk size")
         self.chunk_size= chunk_size
         self.chunk_overlap=chunk_overlap
+        self.embedding_batch_size=embedding_batch_size
 
     def chunk_text(self, text:str)-> list[TextChunk]:
         words= text.split()
