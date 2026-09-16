@@ -1,6 +1,9 @@
 from typing import Iterable
 import os
 from __future__ import annotations
+import psycopg
+from openai import AsyncOpenAI
+from pgvector.psycopg import register_vector_async
 class TextChunk:
     chunk_index:int
     content:str
@@ -56,3 +59,41 @@ class DocumentChunkingService:
             embeddings.extend(item.embedding for item in response.data)
 
         return embeddings
+
+    async def process_and_store(
+            self, document_id: int, extracted_text: str
+        ) -> int:
+            chunks = self.chunk_text(extracted_text)
+            embeddings = await self.embed(chunks)
+    
+            async with await psycopg.AsyncConnection.connect(
+                host="localhost",
+                dbname=os.environ.get("POSTGRES_DB"),
+                user=os.environ.get("POSTGRES_USER"),
+                password=os.environ.get("POSTGRES_PASSWORD"),
+            ) as conn:
+                await register_vector_async(conn)
+                async with conn.cursor() as cur:
+                    # Reprocessing replaces the old chunks, so retries do not duplicate data.
+                    await cur.execute(
+                        "DELETE FROM document_chunks WHERE document_id = %s",
+                        (document_id,),
+                    )
+                    await cur.executemany(
+                        """
+                        INSERT INTO document_chunks
+                            (document_id, chunk_index, content, embedding)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        [
+                            (document_id, chunk.chunk_index, chunk.content, embedding)
+                            for chunk, embedding in zip(chunks, embeddings)
+                        ],
+                    )
+                    await cur.execute(
+                        "UPDATE documents SET status = %s, error_message = NULL WHERE id = %s",
+                        ("PROCESSED", document_id),
+                    )
+    
+            return len(chunks)
+    
