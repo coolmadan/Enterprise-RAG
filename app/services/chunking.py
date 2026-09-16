@@ -14,6 +14,7 @@ class DocumentChunkingService:
             chunk_size:int=500,
             chunk_overlap: int=75,
             embedding_batch_size: int = 100,
+            embedding_model="qwen:3b"
     )-> None:
         if chunk_overlap >= chunk_size:
             raise ValueError("Chunk overlap must be smaller than chunk size")
