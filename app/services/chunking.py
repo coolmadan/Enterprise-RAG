@@ -1,3 +1,4 @@
+from typing import Iterable
 class TextChunk:
     chunk_index:int
     content:str
@@ -26,7 +27,6 @@ class DocumentChunkingService:
         i=0
 
         for i, start in enumerate(range(0,len(text),step)):
-            
             content = " ".join(
             words[start:start + self.chunk_size]
         ).strip()
@@ -37,3 +37,17 @@ class DocumentChunkingService:
 
                 chunks.append(chunk)
         return chunks
+
+    async def embed(self, chunks: Iterable[TextChunk]) -> list[list[float]]:
+        chunks = list(chunks)
+        embeddings: list[list[float]] = []
+
+        for start in range(0, len(chunks), self.embedding_batch_size):
+            batch = chunks[start : start + self.embedding_batch_size]
+            response = await self.client.embeddings.create(
+                model=self.embedding_model,
+                input=[chunk.content for chunk in batch],
+            )
+            embeddings.extend(item.embedding for item in response.data)
+
+        return embeddings
